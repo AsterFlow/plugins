@@ -96,19 +96,19 @@ class PluginBuilder {
     await build({
       ...sharedConfig,
       format: 'cjs',
-      outDir: join(this.publishDir, pluginName, 'cjs')
+      outDir: join(this.publishDir, pluginName, 'dist', 'cjs')
     })
 
     console.log(`  Building ESM for ${pluginName}...`)
     await build({
       ...sharedConfig,
       format: 'esm',
-      outDir: join(this.publishDir, pluginName, 'mjs'),
+      outDir: join(this.publishDir, pluginName, 'dist', 'mjs'),
       splitting: true
     })
 
-    await writeFile(join(this.publishDir, pluginName, 'cjs/package.json'), JSON.stringify({ type: 'commonjs' }, null, 2))
-    await writeFile(join(this.publishDir, pluginName, 'mjs/package.json'), JSON.stringify({ type: 'module' }, null, 2))
+    await writeFile(join(this.publishDir, pluginName, 'dist/cjs/package.json'), JSON.stringify({ type: 'commonjs' }, null, 2))
+    await writeFile(join(this.publishDir, pluginName, 'dist/mjs/package.json'), JSON.stringify({ type: 'module' }, null, 2))
   }
 
   /**
@@ -118,7 +118,7 @@ class PluginBuilder {
    */
   private async generateDts(pluginPath: string, pluginName: string): Promise<void> {
     console.log(`  Generating DTS for ${pluginName}...`)
-    const dtsPath = join(process.cwd(), this.publishDir, pluginName, 'types/index.d.ts')
+    const dtsPath = join(process.cwd(), this.publishDir, pluginName, 'dist', 'types/index.d.ts')
     const dtsCode = generateDtsBundle([{
       filePath: join(process.cwd(), pluginPath, 'src/index.ts'),
       output: {
