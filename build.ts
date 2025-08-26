@@ -16,17 +16,27 @@ interface PackageInfo {
   publishPath: string
 }
 
+// Interface para a estrutura de um package.json
+interface PackageJson {
+  name?: string
+  version?: string
+  dependencies?: Record<string, string>
+  devDependencies?: Record<string, string>
+  [key: string]: any
+}
+
 class PluginBuilder {
   private pluginsDir: string
   private publishDir: string
   private assetsToCopy: string[]
   private baseTsConfigPath: string
   private readonly CLI = '\x1b[34mCLI\x1b[0m'
+  private rootPackageJson: PackageJson = {}
 
   constructor(pluginsDir: string = 'plugins', publishDir: string = 'publish') {
     this.pluginsDir = pluginsDir
     this.publishDir = publishDir
-    this.assetsToCopy = ['README.md', 'package.json']
+    this.assetsToCopy = ['README.md']
     this.baseTsConfigPath = join(process.cwd(), pluginsDir, 'tsconfig.base.json')
   }
 
@@ -36,6 +46,7 @@ class PluginBuilder {
   async run(): Promise<void> {
     console.log(`${this.CLI} Starting plugin publishing process.`)
     await this.cleanPublishDir()
+    await this.loadRootPackageJson()
 
     const plugins = await glob(`${this.pluginsDir}/*/`)
 
@@ -82,6 +93,8 @@ class PluginBuilder {
     await this.generateDts(pluginPath, pluginName)
 
     const packageInfo = await this.readPackageInfo(pluginPath, pluginName)
+    
+    await this.processPackageJson(pluginPath, pluginName)
     await this.mergeTsConfig(packageInfo)
     await this.copyAssets(pluginPath, pluginName, this.assetsToCopy)
   }
@@ -164,6 +177,54 @@ class PluginBuilder {
   }
 
   /**
+   * NOVO MÉTODO: Carrega o package.json da raiz do projeto.
+   */
+  private async loadRootPackageJson(): Promise<void> {
+    const rootPackageJsonPath = join(process.cwd(), 'package.json')
+    console.log(`${this.CLI} Reading root package.json from ${rootPackageJsonPath}`)
+    try {
+      const content = await readFile(rootPackageJsonPath, 'utf-8')
+      this.rootPackageJson = JSON.parse(content)
+    } catch (error) {
+      console.warn(`${this.CLI} \x1b[33mWarning:\x1b[0m Could not read or parse root package.json. Global dependencies will not be merged.`, error)
+      this.rootPackageJson = {}
+    }
+  }
+
+  /**
+   * Mescla as dependências do package.json da raiz com o do plugin.
+   * @param pluginPath O caminho do diretório fonte do plugin.
+   * @param pluginName O nome do plugin.
+   */
+  private async processPackageJson(pluginPath: string, pluginName: string): Promise<void> {
+    const pluginPackageJsonPath = join(pluginPath, 'package.json')
+    if (!existsSync(pluginPackageJsonPath)) {
+      console.log(`  Skipping package.json processing: file not found at ${pluginPackageJsonPath}`)
+      return
+    }
+
+    console.log(`  Processing package.json for ${pluginName}...`)
+    const pluginPkgContent = await readFile(pluginPackageJsonPath, 'utf-8')
+    const pluginPkg: PackageJson = JSON.parse(pluginPkgContent)
+
+    // Mescla as dependências. As dependências do plugin sobrescrevem as da raiz.
+    const mergedDependencies = {
+      ...(this.rootPackageJson.dependencies || {}),
+      ...(pluginPkg.dependencies || {})
+    }
+
+    // Cria o objeto final do package.json
+    const finalPkg = {
+      ...pluginPkg,
+      dependencies: mergedDependencies
+    }
+
+    const targetPath = join(this.publishDir, pluginName, 'package.json')
+    await writeFile(targetPath, JSON.stringify(finalPkg, null, 2))
+    console.log(`  Generated merged package.json at ${targetPath}`)
+  }
+
+  /**
    * Mescla o tsconfig.json base com o tsconfig.json do pacote e o salva no diretório de publicação.
    * @param packageInfo Informações do pacote para mesclar o tsconfig.
    */
@@ -237,6 +298,7 @@ class PluginBuilder {
       const targetFull = join(this.publishDir, targetDir, asset)
       if (existsSync(sourceFull)) {
         console.log(`  Copying asset: ${asset}`)
+        await mkdir(dirname(targetFull), { recursive: true })
         await cp(sourceFull, targetFull)
       } else {
         console.log(`  Skipping asset: ${asset} (not found at ${sourceFull})`)

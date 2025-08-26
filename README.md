@@ -15,7 +15,7 @@ Plugins are integrated into your AsterFlow application using the `.use()` method
 Here is a general example of how to register and configure a plugin:
 
 ```typescript
-import { AsterFlow } from '@asterflow/core';
+import { AsterFlow } from 'asterflow';
 import { fsRouting } from '@asterflow/fs';
 import { join } from 'path';
 
@@ -39,7 +39,7 @@ Here is a quick overview of the plugin creation API:
 
 ```typescript
 import { Plugin } from '@asterflow/plugin';
-import type { AsterFlow } from '@asterflow/core';
+import type { AsterFlow } from 'asterflow';
 
 // It's good practice to type the AsterFlow instance
 const myPlugin = Plugin.instance<AsterFlow>()
