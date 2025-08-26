@@ -76,7 +76,7 @@ In your main application file, import and register the `fsRouting` plugin.
 **`src/index.ts`**
 
 ```typescript
-import { AsterFlow } from '@asterflow/core';
+import { AsterFlow } from 'asterflow';
 import { fsRouting } from '@asterflow/fs';
 import { join } from 'path';
 
@@ -112,7 +112,7 @@ The plugin transforms file paths into URL routes based on the following rules:
 
 ## 🔗 Related Packages
 
-  - [@asterflow/core](https://www.npmjs.com/package/@asterflow/core) - The core of the AsterFlow framework.
+  - [asterflow](https://www.npmjs.com/package/asterflow) - The core of the AsterFlow framework.
   - [@asterflow/plugin](https://www.npmjs.com/package/@asterflow/plugin) - The main plugin system.
   - [@asterflow/router](https://www.npmjs.com/package/@asterflow/router) - The type-safe routing system used by this plugin.
 

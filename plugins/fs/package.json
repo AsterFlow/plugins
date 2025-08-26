@@ -1,6 +1,6 @@
 {
   "name": "@asterflow/fs",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "main": "dist/cjs/index.cjs",
   "module": "dist/mjs/index.js",
   "types": "dist/types/index.d.ts",
@@ -26,15 +26,8 @@
   "engines": {
     "node": ">=20"
   },
-  "devDependencies": {
-    "@asterflow/core": "^1.0.7",
-    "@types/bun": "latest"
-  },
-  "peerDependencies": {
-    "typescript": "^5.8.3"
-  },
   "dependencies": {
-    "@asterflow/router": "^1.0.7",
-    "@asterflow/url-parser": "^2.0.1"
+    "@asterflow/router": "^1.0.9",
+    "@asterflow/url-parser": "^2.0.2"
   }
 }
