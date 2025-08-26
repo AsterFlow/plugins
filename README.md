@@ -6,7 +6,8 @@ This directory contains official plugins maintained by the AsterFlow team. These
 
 | Plugin | Version | Description |
 | ------ |-------- | ----------- |
-| [@asterflow/fs](https://github.com/AsterFlow/plugins/tree/main/plugins/fs) | [![npm version](https://img.shields.io/npm/v/@asterflow/fs.svg?style=flat-square)](https://www.npmjs.com/package/@asterflow/fs) | Adds file system convention-based routing. |
+| [@asterflow/fs](https://github.com/AsterFlow/plugins/tree/main/plugins/fs) | [![npm version](https://img.shields.io/npm/v/@asterflow/fs.svg?style=for-the-badge&colorA=302D41&colorB=3ac97b)](https://www.npmjs.com/package/@asterflow/fs) | Adds file system convention-based routing. |
+| [@asterflow/multipart](https://github.com/AsterFlow/plugins/tree/main/plugins/multipart) | [![npm version](https://img.shields.io/npm/v/@asterflow/multipart.svg?style=for-the-badge&colorA=302D41&colorB=3ac97b)](https://www.npmjs.com/package/@asterflow/multipart) | Multipart form data parsing with file upload support. |
 
 ## 🚀 How to Use a Plugin
 
