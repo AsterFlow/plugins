@@ -7,6 +7,7 @@ import { logWarning } from './utils/log'
 
 export * from './utils/format'
 export * from './utils/glob'
+export * from './types/asterflow.d'
 
 export type FSRoutingContext = {
   path: string
@@ -47,9 +48,10 @@ export const fsRoutingPlugin = Plugin
           })
           continue
         }
-        
-        exported.path = transformPathToUrl(file, context.path)
-        instance.controller(exported)
+
+        if (!exported.path) exported.path = transformPathToUrl(file, context.path)
+
+          instance.controller(exported)
       }
     }
   }))
