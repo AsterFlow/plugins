@@ -2,8 +2,12 @@ import { Plugin } from '@asterflow/plugin'
 import { unlink } from 'fs/promises'
 import * as pkg from '../package.json'
 import { BusboyMultipartParser } from './controllers/busboy'
-import { MultipartError, type MultipartConfig, type MultipartResult, type ParserEvents, MultipartErrorCodes } from './types/multipart'
+import { MultipartError, MultipartErrorCodes, type MultipartConfig, type MultipartResult, type ParserEvents } from './types/multipart'
 import { debug, logError } from './utils/log'
+
+export * from './controllers/busboy'
+export * from './types/asterflow.d'
+export * from './types/multipart'
 
 export const multipartPlugin = Plugin
   .create({ name: 'multipart' })

@@ -7,21 +7,24 @@
     "lint": "eslint -c eslint.config.js --fix",
     "dev": "bun run --inspect-brk=ws://localhost:6499 core/src/exemple.ts",
     "build": "bun run build.ts",
+    "publish-local": "bun run build.ts --local",
     "publish": "bun run publish.ts"
   },
   "devDependencies": {
-    "@eslint/js": "^9.31.0",
+    "@eslint/js": "^9.34.0",
     "@types/bun": "latest",
     "@types/semver": "^7.7.0",
+    "@types/yargs": "^17.0.33",
     "dts-bundle-generator": "^9.5.1",
-    "esbuild": "^0.25.8",
-    "eslint": "^9.31.0",
+    "esbuild": "^0.25.9",
+    "eslint": "^9.34.0",
     "glob": "^11.0.3",
     "globals": "^16.3.0",
     "json5": "^2.2.3",
     "semver": "^7.7.2",
     "tsup": "^8.5.0",
-    "typescript-eslint": "^8.38.0"
+    "typescript-eslint": "^8.41.0",
+    "yargs": "^18.0.0"
   },
   "peerDependencies": {
     "typescript": "^5.8.3"
@@ -30,6 +33,6 @@
     "esbuild"
   ],
   "dependencies": {
-    "@asterflow/plugin": "^1.0.5"
+    "@asterflow/plugin": "^1.0.6"
   }
 }

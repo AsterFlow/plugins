@@ -20,7 +20,7 @@ import { debug } from '../utils/log'
 /**
  * ProcessedFile implementation compatible with Busboy
  */
-class BusboyProcessedFile implements ProcessedFile {
+export class BusboyProcessedFile implements ProcessedFile {
   fieldName: string
   filename: string
   encoding: string
@@ -461,13 +461,6 @@ export class BusboyMultipartParser {
     
     await writeFile(tempPath, data)
     return tempPath
-  }
-
-  /**
-   * Resource cleanup
-   */
-  private async cleanup(): Promise<void> {
-    // Implement cleanup if necessary
   }
 
   /**

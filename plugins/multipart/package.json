@@ -1,6 +1,6 @@
 {
   "name": "@asterflow/multipart",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "main": "dist/cjs/index.cjs",
   "module": "dist/mjs/index.js",
   "types": "dist/types/index.d.ts",
@@ -27,7 +27,7 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@asterflow/plugin": "^1.0.5",
+    "@asterflow/plugin": "^1.0.6",
     "busboy": "^1.6.0"
   },
   "devDependencies": {

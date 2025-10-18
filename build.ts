@@ -1,14 +1,19 @@
+// build.ts
+
+import { exec } from 'child_process'
 import { generateDtsBundle } from 'dts-bundle-generator'
 import { existsSync } from 'fs'
-import { cp, mkdir, readFile, rm, writeFile } from 'fs/promises'
+import { cp, mkdir, readFile, rename, rm, writeFile } from 'fs/promises'
 import { glob } from 'glob'
 import JSON5 from 'json5'
 import { dirname, join } from 'path'
 import { build, type Options } from 'tsup'
+import { promisify } from 'util'
+import yargs from 'yargs'
+import { hideBin } from 'yargs/helpers'
 
-/**
- * Interface para informações do pacote.
- */
+const execAsync = promisify(exec)
+
 interface PackageInfo {
   name: string
   version: string
@@ -16,7 +21,6 @@ interface PackageInfo {
   publishPath: string
 }
 
-// Interface para a estrutura de um package.json
 interface PackageJson {
   name?: string
   version?: string
@@ -40,30 +44,44 @@ class PluginBuilder {
     this.baseTsConfigPath = join(process.cwd(), pluginsDir, 'tsconfig.base.json')
   }
 
-  /**
-   * Executa o processo de build e publicação dos plugins.
-   */
-  async run(): Promise<void> {
-    console.log(`${this.CLI} Starting plugin publishing process.`)
+  async run(packageName?: string, isLocalPublish: boolean = false): Promise<void> {
+    const action = isLocalPublish ? 'local packaging' : 'publishing'
+    console.log(`${this.CLI} Starting plugin ${action} process.`)
+
     await this.cleanPublishDir()
     await this.loadRootPackageJson()
 
-    const plugins = await glob(`${this.pluginsDir}/*/`)
+    let plugins: string[]
+
+    if (packageName) {
+      const specificPluginPath = join(this.pluginsDir, packageName, '/')
+      if (!existsSync(specificPluginPath)) {
+        console.error(`\x1b[31mError:\x1b[0m Pacote '${packageName}' não encontrado em ${specificPluginPath}`)
+        process.exit(1)
+      }
+      plugins = [specificPluginPath]
+      console.log(`${this.CLI} Processando apenas o pacote: \x1b[36m${packageName}\x1b[0m`)
+    } else {
+      plugins = await glob(`${this.pluginsDir}/*/`)
+      console.log(`${this.CLI} Processando todos os pacotes.`)
+    }
 
     for (const pluginPath of plugins) {
       const pluginName = pluginPath.split('/').filter(Boolean).pop()
       if (!pluginName) continue
 
       console.log(`\n📦 Processing plugin: \x1b[33m${pluginName}\x1b[0m`)
-      await this.processPlugin(pluginPath, pluginName)
+      const packageInfo = await this.processPlugin(pluginPath, pluginName)
+
+      if (isLocalPublish && packageInfo) {
+        await this.packPluginForLocalInstall(packageInfo)
+      }
+
       console.log(`  ✨ Done with ${pluginName}.`)
     }
     console.log(`\n${this.CLI} All plugins processed successfully.`)
   }
 
-  /**
-   * Limpa o diretório de publicação.
-   */
   private async cleanPublishDir(): Promise<void> {
     if (existsSync(this.publishDir)) {
       console.log(`${this.CLI} Cleaning existing publish directory: ${this.publishDir}`)
@@ -71,12 +89,7 @@ class PluginBuilder {
     }
   }
 
-  /**
-   * Processa um único plugin: build, geração de DTS, mesclagem de tsconfig e cópia de assets.
-   * @param pluginPath O caminho completo do diretório do plugin (ex: plugins/my-plugin).
-   * @param pluginName O nome do plugin (ex: my-plugin).
-   */
-  private async processPlugin(pluginPath: string, pluginName: string): Promise<void> {
+  private async processPlugin(pluginPath: string, pluginName: string): Promise<PackageInfo | undefined> {
     const sharedConfig: Options = {
       platform: 'node',
       entry: [join(pluginPath, 'src/index.ts')],
@@ -91,19 +104,14 @@ class PluginBuilder {
 
     await this.buildPlugin(pluginName, sharedConfig)
     await this.generateDts(pluginPath, pluginName)
-
     const packageInfo = await this.readPackageInfo(pluginPath, pluginName)
-    
     await this.processPackageJson(pluginPath, pluginName)
     await this.mergeTsConfig(packageInfo)
     await this.copyAssets(pluginPath, pluginName, this.assetsToCopy)
+
+    return packageInfo
   }
 
-  /**
-   * Realiza o build de um plugin para CJS e ESM.
-   * @param pluginName O nome do plugin.
-   * @param sharedConfig Configuração base do tsup.
-   */
   private async buildPlugin(pluginName: string, sharedConfig: Options): Promise<void> {
     console.log(`  Building CJS for ${pluginName}...`)
     await build({
@@ -124,11 +132,6 @@ class PluginBuilder {
     await writeFile(join(this.publishDir, pluginName, 'dist/mjs/package.json'), JSON.stringify({ type: 'module' }, null, 2))
   }
 
-  /**
-   * Gera os arquivos de declaração (.d.ts) para o plugin.
-   * @param pluginPath O caminho completo do diretório do plugin.
-   * @param pluginName O nome do plugin.
-   */
   private async generateDts(pluginPath: string, pluginName: string): Promise<void> {
     console.log(`  Generating DTS for ${pluginName}...`)
     const dtsPath = join(process.cwd(), this.publishDir, pluginName, 'dist', 'types/index.d.ts')
@@ -146,12 +149,6 @@ class PluginBuilder {
     await writeFile(dtsPath, dtsCode.join('\n'), { encoding: 'utf-8' })
   }
 
-  /**
-   * Lê as informações do package.json de um plugin.
-   * @param pluginPath O caminho completo do diretório do plugin.
-   * @param pluginName O nome do plugin.
-   * @returns As informações do pacote.
-   */
   private async readPackageInfo(pluginPath: string, pluginName: string): Promise<PackageInfo> {
     const pluginPackageJsonPath = join(pluginPath, 'package.json')
     let pkgName = pluginName
@@ -176,9 +173,6 @@ class PluginBuilder {
     }
   }
 
-  /**
-   * NOVO MÉTODO: Carrega o package.json da raiz do projeto.
-   */
   private async loadRootPackageJson(): Promise<void> {
     const rootPackageJsonPath = join(process.cwd(), 'package.json')
     console.log(`${this.CLI} Reading root package.json from ${rootPackageJsonPath}`)
@@ -191,11 +185,6 @@ class PluginBuilder {
     }
   }
 
-  /**
-   * Mescla as dependências do package.json da raiz com o do plugin.
-   * @param pluginPath O caminho do diretório fonte do plugin.
-   * @param pluginName O nome do plugin.
-   */
   private async processPackageJson(pluginPath: string, pluginName: string): Promise<void> {
     const pluginPackageJsonPath = join(pluginPath, 'package.json')
     if (!existsSync(pluginPackageJsonPath)) {
@@ -206,32 +195,19 @@ class PluginBuilder {
     console.log(`  Processing package.json for ${pluginName}...`)
     const pluginPkgContent = await readFile(pluginPackageJsonPath, 'utf-8')
     const pluginPkg: PackageJson = JSON.parse(pluginPkgContent)
-
-    // Mescla as dependências. As dependências do plugin sobrescrevem as da raiz.
     const mergedDependencies = {
       ...(this.rootPackageJson.dependencies || {}),
       ...(pluginPkg.dependencies || {})
     }
-
-    // Cria o objeto final do package.json
-    const finalPkg = {
-      ...pluginPkg,
-      dependencies: mergedDependencies
-    }
-
+    const finalPkg = { ...pluginPkg, dependencies: mergedDependencies }
     const targetPath = join(this.publishDir, pluginName, 'package.json')
     await writeFile(targetPath, JSON.stringify(finalPkg, null, 2))
     console.log(`  Generated merged package.json at ${targetPath}`)
   }
 
-  /**
-   * Mescla o tsconfig.json base com o tsconfig.json do pacote e o salva no diretório de publicação.
-   * @param packageInfo Informações do pacote para mesclar o tsconfig.
-   */
   private async mergeTsConfig(packageInfo: PackageInfo): Promise<void> {
     const { path: packageSourcePath, publishPath } = packageInfo
     const packageConfigPath = join(packageSourcePath, 'tsconfig.json')
-
     if (!existsSync(packageConfigPath)) {
       console.warn(`${this.CLI} \x1b[33mWarning:\x1b[0m No tsconfig.json found for \x1b[36m${packageInfo.name}\x1b[0m at ${packageConfigPath}. Skipping tsconfig merge.`)
       return
@@ -250,9 +226,7 @@ class PluginBuilder {
     console.log(`${this.CLI} Reading package tsconfig from ${packageConfigPath}`)
     const packageConfigContent = await readFile(packageConfigPath, 'utf-8')
     const packageConfig = JSON5.parse(packageConfigContent)
-
     delete packageConfig.extends
-
     const mergedConfig: any = {
       ...baseConfig,
       compilerOptions: {
@@ -266,10 +240,8 @@ class PluginBuilder {
       delete mergedConfig.compilerOptions.baseUrl
       delete mergedConfig.compilerOptions.paths
     }
-
     mergedConfig.include = ['types']
     mergedConfig.exclude = ['node_modules', '**/*.spec.ts']
-
     if (mergedConfig.compilerOptions) {
       const typesPath = './types'
       mergedConfig.compilerOptions.paths = {
@@ -279,19 +251,12 @@ class PluginBuilder {
       mergedConfig.compilerOptions.declaration = true
       mergedConfig.compilerOptions.declarationMap = true
     }
-
     const mergedConfigPath = join(publishPath, 'tsconfig.json')
     await mkdir(dirname(mergedConfigPath), { recursive: true })
     await writeFile(mergedConfigPath, JSON.stringify(mergedConfig, null, 2))
     console.log(`${this.CLI} Generated merged tsconfig at ${mergedConfigPath}`)
   }
 
-  /**
-   * Copia assets para o diretório de publicação do plugin.
-   * @param sourcePath O caminho do diretório fonte do plugin.
-   * @param targetDir O nome do diretório de destino dentro de 'publish'.
-   * @param assets Uma lista de nomes de arquivos para copiar.
-   */
   private async copyAssets(sourcePath: string, targetDir: string, assets: string[]): Promise<void> {
     for (const asset of assets) {
       const sourceFull = join(sourcePath, asset)
@@ -305,6 +270,63 @@ class PluginBuilder {
       }
     }
   }
+
+  private async packPluginForLocalInstall(packageInfo: PackageInfo): Promise<void> {
+    console.log(`  🥡 Packing ${packageInfo.name} for local installation...`)
+    const publishPath = join(process.cwd(), packageInfo.publishPath)
+
+    try {
+      const { stdout } = await execAsync('bun pm pack', { cwd: publishPath })
+
+      // **LÓGICA CORRIGIDA**: Extrai apenas a linha com o nome do arquivo .tgz
+      const tgzFileName = stdout
+        .split('\n') // 1. Divide a saída em um array de linhas
+        .find(line => line.endsWith('.tgz')) // 2. Encontra a linha que termina com .tgz
+        ?.trim() // 3. Remove espaços em branco extras (o ?. é para segurança)
+
+      if (!tgzFileName) {
+        throw new Error(`Could not determine packed file name from \`bun pm pack\` output.\nReceived: ${stdout}`)
+      }
+
+      const sourceTgzPath = join(publishPath, tgzFileName)
+      const localPackagesDir = join(process.cwd(), 'local-packages')
+      await mkdir(localPackagesDir, { recursive: true })
+      const targetTgzPath = join(localPackagesDir, tgzFileName)
+
+      await rename(sourceTgzPath, targetTgzPath)
+
+      console.log(`  ✅ Packed successfully!`)
+      console.log(`  📂 File created: \x1b[32m${targetTgzPath}\x1b[0m`)
+      console.log(`  💡 To install, run: \x1b[36mbun add ${targetTgzPath}\x1b[0m`)
+    } catch (error) {
+      console.error(`  \x1b[31mError:\x1b[0m Failed to pack ${packageInfo.name}.`, error)
+    }
+  }
 }
 
-await new PluginBuilder().run()
+async function main() {
+  const argv = await yargs(hideBin(process.argv))
+    .options({
+      package: {
+        alias: 'p',
+        type: 'string',
+        describe: 'Nome do pacote específico para processar (ex: fs, multipart)',
+        demandOption: false
+      },
+      local: {
+        type: 'boolean',
+        describe: 'Gera um pacote .tgz para instalação local em vez de publicar.',
+        default: false
+      }
+    })
+    .help()
+    .parse()
+
+  const builder = new PluginBuilder()
+  await builder.run(argv.package as string, argv.local)
+}
+
+main().catch((error) => {
+  console.error('Erro durante o processo:', error)
+  process.exit(1)
+})

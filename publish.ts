@@ -1,9 +1,12 @@
 import { glob } from 'glob'
 import { readFile, writeFile } from 'fs/promises'
-import { join } from 'path'
+import { join, dirname } from 'path'
+import { existsSync } from 'fs'
 import { inc } from 'semver'
 import { exec } from 'child_process'
 import { promisify } from 'util'
+import yargs from 'yargs'
+import { hideBin } from 'yargs/helpers'
 
 const execAsync = promisify(exec)
 
@@ -39,8 +42,17 @@ class Publisher {
       console.log(`${this.PUBLISH} Publicando ${pkg.name}@${pkg.version}`)
       
       // Executa npm publish na pasta publish/[package]
+      const packageName = pkgPath.split('/').filter(Boolean).pop() || ''
+      const publishDir = join('publish', packageName)
+      
+      if (!existsSync(publishDir)) {
+        throw new Error(`Diretório de publicação não encontrado: ${publishDir}`)
+      }
+      
+      console.log(`${this.PUBLISH} Executando npm publish em: ${publishDir}`)
+      
       await execAsync('npm publish --access public', {
-        cwd: join('publish', pkgPath.split('/').pop() || '')
+        cwd: publishDir
       })
       
       console.log(`${this.PUBLISH} ${pkg.name}@${pkg.version} publicado com sucesso!`)
@@ -50,10 +62,25 @@ class Publisher {
     }
   }
 
-  public async publish(): Promise<void> {
+  public async publish(packageName?: string): Promise<void> {
     try {
-      // Primeiro atualiza todas as versões
-      const packages = await glob(['plugins/*/'])
+      let packages: string[]
+      
+      if (packageName) {
+        // Processar apenas o pacote específico
+        const specificPackagePath = `plugins/${packageName}/`
+        if (!existsSync(specificPackagePath)) {
+          console.error(`\x1b[31mError:\x1b[0m Pacote '${packageName}' não encontrado em ${specificPackagePath}`)
+          process.exit(1)
+        }
+        packages = [specificPackagePath]
+        console.log(`${this.CLI} Processando apenas o pacote: \x1b[36m${packageName}\x1b[0m`)
+      } else {
+        // Processar todos os pacotes
+        packages = await glob(['plugins/*/'])
+        console.log(`${this.CLI} Processando todos os pacotes.`)
+      }
+      
       console.log(`${this.CLI} Pacotes encontrados:`, packages)
 
       for (const pkg of packages) {
@@ -62,7 +89,11 @@ class Publisher {
 
       // Executa o build para garantir que tudo está atualizado
       console.log(`${this.CLI} Executando build...`)
-      await execAsync('bun run build')
+      if (packageName) {
+        await execAsync(`bun run build --package ${packageName}`)
+      } else {
+        await execAsync('bun run build')
+      }
       console.log(`${this.CLI} Build concluído.`)
 
       // Publica os pacotes
@@ -78,6 +109,28 @@ class Publisher {
   }
 }
 
-// Execute publish
-const publisher = new Publisher()
-publisher.publish().catch(console.error)
+// Main execution function
+async function main() {
+  // Parse command line arguments
+  const argv = await yargs(hideBin(process.argv))
+    .options({
+      'package': {
+        alias: 'p',
+        type: 'string',
+        describe: 'Nome do pacote específico para publicar (ex: fs, multipart)',
+        demandOption: false
+      }
+    })
+    .help()
+    .parse()
+
+  // Execute publish
+  const publisher = new Publisher()
+  await publisher.publish(argv.package)
+}
+
+// Execute main function
+main().catch((error) => {
+  console.error('Erro durante a publicação:', error)
+  process.exit(1)
+})
